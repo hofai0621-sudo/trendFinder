@@ -46,6 +46,51 @@ async function sendDraftToSlack(draft_post: string) {
   }
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+async function sendDraftToTelegram(draft_post: string) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+
+  if (!botToken || !chatId) {
+    throw new Error('TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set');
+  }
+
+  const timestamp = new Date().toISOString();
+  const message =
+    `🔍 <b>TrendFinder Alert</b>\n\n` +
+    `${escapeHtml(draft_post)}\n\n` +
+    `⏰ ${timestamp}`;
+
+  try {
+    await axios.post(
+      `https://api.telegram.org/bot${botToken}/sendMessage`,
+      {
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    return `Success sending draft to Telegram at ${timestamp}`;
+  } catch (error) {
+    console.log('Error sending draft to Telegram');
+    console.error(error);
+    throw error;
+  }
+}
+
 export async function sendDraft(draft_post: string) {
   const notificationDriver = process.env.NOTIFICATION_DRIVER?.toLowerCase();
 
@@ -54,6 +99,8 @@ export async function sendDraft(draft_post: string) {
       return sendDraftToSlack(draft_post);
     case 'discord':
       return sendDraftToDiscord(draft_post);
+    case 'telegram':
+      return sendDraftToTelegram(draft_post);
     default:
       throw new Error(`Unsupported notification driver: ${notificationDriver}`);
   }
